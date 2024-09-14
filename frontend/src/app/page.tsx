@@ -45,7 +45,8 @@ export default function Home() {
 
   return (
     <div>
-      <input type="file" onChange={handleFileChange}/>
+      <label htmlFor="file-upload">ファイルを選択</label>
+      <input id="file-upload" type="file" onChange={handleFileChange}/>
       <button type="button" onClick={upload} disabled={!file}>アップロード</button>
       {uploadStatus && <p>アップロードステータス: {uploadStatus}</p>}
       {uploadedImageUrl && (
