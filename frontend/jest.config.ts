@@ -15,6 +15,15 @@ const config: Config = {
     "^@/(.*)$": "<rootDir>/src/$1",
   },
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+  transform: {
+    '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { presets: ['next/babel'] }],
+  },
+  // 以下の設定を追加
+  testEnvironmentOptions: {
+    customExportConditions: [''],
+  },
+  setupFiles: ['<rootDir>/jest.polyfills.js'],
+  testTimeout: 30000, 
 };
 
 export default createJestConfig(config);

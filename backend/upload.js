@@ -1,30 +1,37 @@
-const multer = require('multer')
-const path = require('path')
-
-// Multerストレージの設定
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "./public/Images"),
-  filename: (req, file, cb) => cb(null, `${Date.now()}_${file.originalname}`)
-})
-
-const upload = multer({ storage })
-
-// ファイルアップロード処理
-const handleFileUpload = (req, res) => {
-  if (req.file) {
-    console.log('アップロードされたファイル:', req.file)
-    res.status(200).json({ 
-      message: 'ファイルが正常にアップロードされました',
-      file: req.file,
-      url: `http://localhost:3001/Images/${req.file.filename}`
-    })
-  } else {
-    console.log('ファイルアップロード失敗')
-    res.status(400).json({ message: 'ファイルのアップロードに失敗しました' })
+const upload = async () => {
+  console.log("Upload started");
+  setUploadStatus("アップロード開始");
+  setUploadedImageUrl(null);
+  
+  if (!file) {
+    console.log("No file selected");
+    setUploadStatus('ファイルが選択されていません');
+    return;
   }
-}
 
-module.exports = {
-  upload,
-  handleFileUpload
-}
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    console.log("Sending request to server");
+    setUploadStatus("サーバーにリクエスト中...");
+    const res = await axios.post('http://localhost:3001/upload', formData);
+    
+    console.log("Server response:", res.data);
+    if (res.data.message) {
+      setUploadStatus(res.data.message);
+    } else {
+      setUploadStatus('ファイルが正常にアップロードされました');
+    }
+    
+    if (res.data.url) {
+      setUploadedImageUrl(res.data.url);
+    }
+  } catch (error) {
+    console.error('アップロードエラー:', error);
+    setUploadStatus('アップロードエラーが発生しました');
+  } finally {
+    console.log("Upload process completed");
+    setUploadStatus(prevStatus => `${prevStatus} (処理完了)`);
+  }
+};
