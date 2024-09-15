@@ -3,41 +3,43 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import axios from 'axios';
 import Home from '@/app/page';
 
-// axiosのモック
+jest.spyOn(console, 'error').mockImplementation(() => {});
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 describe('Home', () => {
   beforeEach(() => {
-    // axiosのモックをリセット
     mockedAxios.post.mockReset();
+    jest.clearAllMocks();
   });
 
-  it('renders file input and upload button', () => {
+  const setupComponent = () => {
     render(<Home />);
-    
-    const fileInput = screen.getByLabelText('ファイルを選択');
-    expect(fileInput).toBeInTheDocument();
-
-    const uploadButton = screen.getByRole('button', { name: /アップロード/i });
-    expect(uploadButton).toBeInTheDocument();
-    expect(uploadButton).toBeDisabled();
-  });
-
-  it('enables upload button when file is selected', () => {
-    render(<Home />);
-    
     const fileInput = screen.getByLabelText('ファイルを選択') as HTMLInputElement;
     const uploadButton = screen.getByRole('button', { name: /アップロード/i });
+    return { fileInput, uploadButton };
+  };
 
-    const file = new File(['test'], 'test.png', { type: 'image/png' });
-    fireEvent.change(fileInput, { target: { files: [file] } });
+  const createTestFile = () => new File(['test'], 'test.png', { type: 'image/png' });
 
+  it('renders file input and upload button', () => {
+    const { fileInput, uploadButton } = setupComponent();
+    
+    expect(fileInput).toBeInTheDocument();
+    expect(uploadButton).toBeInTheDocument();
     expect(uploadButton).toBeEnabled();
   });
 
+  it('allows file selection', () => {
+    const { fileInput } = setupComponent();
+    const file = createTestFile();
+    
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    expect(fileInput.files?.[0]).toBe(file);
+  });
+
   it('uploads file and displays status', async () => {
-    // モックレスポンスの設定
     mockedAxios.post.mockResolvedValue({
       data: {
         message: 'ファイルが正常にアップロードされました',
@@ -46,17 +48,15 @@ describe('Home', () => {
       }
     });
 
-    render(<Home />);
-    
-    const fileInput = screen.getByLabelText('ファイルを選択') as HTMLInputElement;
-    const uploadButton = screen.getByRole('button', { name: /アップロード/i });
+    const { fileInput, uploadButton } = setupComponent();
+    const file = createTestFile();
 
-    const file = new File(['test'], 'test.png', { type: 'image/png' });
     fireEvent.change(fileInput, { target: { files: [file] } });
     fireEvent.click(uploadButton);
 
     await waitFor(() => {
-      expect(screen.getByText(/アップロードステータス: ファイルが正常にアップロードされました/)).toBeInTheDocument();
+      const statusElement = screen.getByTestId('upload-status');
+      expect(statusElement).toHaveTextContent('アップロードステータス: ファイルが正常にアップロードされました');
     });
 
     const uploadedImage = await screen.findByAltText('Uploaded');
@@ -64,21 +64,32 @@ describe('Home', () => {
     expect(uploadedImage).toHaveAttribute('src', 'http://localhost:3001/Images/1726356094725_test-image.png');
   });
 
-  it('displays error message on upload failure', async () => {
-    // エラーレスポンスのモック
-    mockedAxios.post.mockRejectedValue(new Error('Network Error'));
-
-    render(<Home />);
+  it('displays "ファイルが選択されていません" when trying to upload without a file', async () => {
+    const { uploadButton } = setupComponent();
     
-    const fileInput = screen.getByLabelText('ファイルを選択') as HTMLInputElement;
-    const uploadButton = screen.getByRole('button', { name: /アップロード/i });
+    fireEvent.click(uploadButton);
+  
+    await waitFor(() => {
+      const statusElement = screen.getByTestId('upload-status');
+      expect(statusElement).toHaveTextContent('アップロードステータス: ファイルが選択されていません');
+    });
+  });
 
-    const file = new File(['test'], 'test.png', { type: 'image/png' });
+  it('displays error message when upload fails', async () => {
+    const mockError = new Error('Network Error');
+    mockedAxios.post.mockRejectedValue(mockError);
+  
+    const { fileInput, uploadButton } = setupComponent();
+    const file = createTestFile();
+  
     fireEvent.change(fileInput, { target: { files: [file] } });
     fireEvent.click(uploadButton);
-
+  
     await waitFor(() => {
-      expect(screen.getByText(/アップロードステータス: アップロードエラーが発生しました/)).toBeInTheDocument();
+      const statusElement = screen.getByTestId('upload-status');
+      expect(statusElement).toHaveTextContent('アップロードステータス: アップロードエラーが発生しました');
     });
+  
+    expect(console.error).toHaveBeenCalledWith('アップロードエラー:', mockError);
   });
 });
